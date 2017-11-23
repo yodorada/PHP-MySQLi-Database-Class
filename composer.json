@@ -1,5 +1,5 @@
 {
-	"name": "dottorekaha/mysqli-db-webservice",
+	"name": "yodorada/mysqli-db-webservice",
 	"description": "PHP MySQL Wrapper and object mapper which utilizes MySQLi and prepared statements. This repo was forked from ThingEngineer and was slightly modified to fit the needs of my tiny Webservice REST-API.",
 	"license": "GPL-3.0",
     "authors": [
