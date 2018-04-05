@@ -757,7 +757,7 @@ class dbObject
                     $regexp = "/^[0-9a-zA-Z -:]*$/";
                     break;
                 default:
-                    $regexp = $type;
+                    $regexp = null;
                     break;
             }
             if (!$regexp) {
