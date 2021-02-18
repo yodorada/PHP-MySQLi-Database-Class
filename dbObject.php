@@ -8,8 +8,8 @@
  * @author    Maya K. Herrmann <maya.k.herrmann@gmail.com>
  * @copyright Copyright (c) 2015
  * @license   http://opensource.org/licenses/gpl-3.0.html GNU Public License
- * @link      http://github.com/dottorekaha/PHP-MySQLi-Database-Class
- * @version   2.6-master
+ * @link      http://github.com/yodorada/PHP-MySQLi-Database-Class
+ * @version   1.0-master
  *
  * @method int count ()
  * @method dbObject ArrayBuilder()
@@ -37,32 +37,38 @@
  * @method string getLastError ()
  * @method string getLastQuery ()
  **/
+
+
 class dbObject
-{
+{ 
     /**
      * Working instance of MysqliDb created earlier
      *
      * @var MysqliDb
      */
     private $db;
+
     /**
      * Models path
      *
-     * @var modelPath
+     * @var string
      */
     protected static $modelPath;
+
     /**
      * An array that holds object data
      *
-     * @var array
+     * @var array $data
      */
-    public $data;
+    public $data = array();
+
     /**
      * Flag to define is object is new or loaded from database
      *
      * @var boolean
      */
     public $isNew = true;
+
     /**
      * Return type: 'Array' to return results as array, 'Object' as object
      * 'Json' as json string
@@ -70,13 +76,15 @@ class dbObject
      * @var string
      */
     public $returnType = 'Object';
+
     /**
      * An array that holds has* objects which should be loaded togeather with main
      * object togeather with main object
      *
-     * @var string
+     * @var array
      */
     private $_with = array();
+    
     /**
      * Per page limit for pagination
      *
@@ -89,24 +97,44 @@ class dbObject
      * @var int
      */
     public static $totalPages = 0;
+
+    /**
+     * Variable which holds an amount of returned rows during paginate queries
+     * @var int
+     */
+    public static $totalCount = 0;	
+
     /**
      * An array that holds insert/update/select errors
      *
-     * @var array
+     * @var array|null
      */
     public $errors = null;
     /**
      * Primary key for an object. 'id' is a default value.
      *
-     * @var stating
+     * @var string
      */
     protected $primaryKey = 'id';
+    
     /**
      * Table name for an object. Class name will be used by default
      *
-     * @var stating
+     * @var string
      */
     protected $dbTable;
+    
+    /**
+     * array of table columns with their defs
+     *
+     * @var array
+     */
+    protected static $fieldData = array();
+
+	/**
+	 * @var array name of the fields that will be skipped during validation, preparing & saving
+	 */
+    protected $toSkip = array();
 
     /**
      * @param array $data Data to preload on object creation
@@ -141,7 +169,7 @@ class dbObject
     /**
      * Magic getter function
      *
-     * @param $name Variable name
+     * @param string $name Variable name
      *
      * @return mixed
      */
@@ -164,13 +192,13 @@ class dbObject
                     $obj = new $modelName;
                     $obj->returnType = $this->returnType;
                     return $this->data[$name] = $obj->byId($this->data[$key]);
-                    break;
+                    
                 case 'hasmany':
                     $key = $this->relations[$name][2];
                     $obj = new $modelName;
                     $obj->returnType = $this->returnType;
                     return $this->data[$name] = $obj->where($key, $this->data[$this->primaryKey])->get();
-                    break;
+                    
                 default:
                     break;
             }
@@ -186,6 +214,7 @@ class dbObject
 
     }
 
+
     public function __isset($name)
     {
         if (isset($this->data[$name])) {
@@ -195,7 +224,7 @@ class dbObject
         if (property_exists($this->db, $name)) {
             return isset($this->db->$name);
         }
-
+        return false;
     }
 
     public function __unset($name)
@@ -240,7 +269,7 @@ class dbObject
     /**
      * Helper function to create a virtual table class
      *
-     * @param string tableName Table name
+     * @param string $tableName Table name
      * @return dbObject
      */
     public static function table($tableName)
@@ -257,10 +286,6 @@ class dbObject
      */
     public function insert()
     {
-        if (!empty($this->timestamps) && in_array("createdAt", $this->timestamps)) {
-            $this->createdAt = date("Y-m-d H:i:s");
-        }
-
         $sqlData = $this->prepareData();
         if (!$this->validate($sqlData)) {
             return false;
@@ -272,7 +297,7 @@ class dbObject
         }
 
         $this->isNew = false;
-
+        $this->toSkip = array();
         return $id;
     }
 
@@ -296,17 +321,15 @@ class dbObject
 
         }
 
-        if (!empty($this->timestamps) && in_array("updatedAt", $this->timestamps)) {
-            $this->updatedAt = date("Y-m-d H:i:s");
-        }
-
         $sqlData = $this->prepareData();
         if (!$this->validate($sqlData)) {
             return false;
         }
 
-        $this->db->where($this->primaryKey, $this->data[$this->primaryKey]);
-        return $this->db->update($this->dbTable, $sqlData);
+        $this->db->where ($this->primaryKey, $this->data[$this->primaryKey]);
+	    $res = $this->db->update ($this->dbTable, $sqlData);
+	    $this->toSkip = array();
+        return $res;
     }
 
     /**
@@ -334,18 +357,36 @@ class dbObject
             return false;
         }
 
-        $this->db->where($this->primaryKey, $this->data[$this->primaryKey]);
-        return $this->db->delete($this->dbTable);
+        $this->db->where ($this->primaryKey, $this->data[$this->primaryKey]);
+        $res = $this->db->delete ($this->dbTable);
+        $this->toSkip = array();
+        return $res;
     }
-
+    /**
+	 * chained method that append a field or fields to skipping
+	 * @param mixed|array|false $field field name; array of names; empty skipping if false
+	 * @return $this
+	 */
+    public function skip($field){
+	    if(is_array($field)) {
+		    foreach ($field as $f) {
+			    $this->toSkip[] = $f;
+		    }
+	    } else if($field === false) {
+	    	$this->toSkip = array();
+	    } else{
+	    	$this->toSkip[] = $field;
+	    }
+	    return $this;
+    }
     /**
      * Get object by primary key.
      *
      * @access public
-     * @param $id Primary Key
+     * @param int $id Primary Key
      * @param array|string $fields Array or coma separated list of fields to fetch
      *
-     * @return dbObject|array
+     * @return dbObject
      */
     private function byId($id, $fields = null)
     {
@@ -359,7 +400,7 @@ class dbObject
      * @access public
      * @param array|string $fields Array or coma separated list of fields to fetch
      *
-     * @return dbObject
+     * @return mixed
      */
     protected function getOne($fields = null)
     {
@@ -380,12 +421,38 @@ class dbObject
             return $results;
         }
 
-        $item = new static($results);
+        $item = new static($results); // @phpstan-ignore-line
         $item->isNew = false;
 
         return $item;
     }
 
+    /**
+     * A convenient SELECT COLUMN function to get a single column value from model object
+     *
+     * @param string $column    The desired column
+     * @param int    $limit     Limit of rows to select. Use null for unlimited..1 by default
+     *
+     * @return mixed Contains the value of a returned column / array of values
+     * @throws Exception
+     */
+    protected function getValue ($column, $limit = 1) {
+        $res = $this->db->ArrayBuilder()->getValue ($this->dbTable, $column, $limit);
+        if (!$res)
+            return null;
+        return $res;
+    }
+
+    /**
+     * A convenient function that returns TRUE if exists at least an element that
+     * satisfy the where condition specified calling the "where" method before this one.
+     *
+     * @return bool
+     * @throws Exception
+     */
+    protected function has() {
+        return $this->db->has($this->dbTable);
+    }
     /**
      * Fetch all objects
      *
@@ -394,7 +461,7 @@ class dbObject
      *                             or only $count
      * @param array|string $fields Array or coma separated list of fields to fetch
      *
-     * @return array Array of dbObjects
+     * @return mixed
      */
     protected function get($limit = null, $fields = null)
     {
@@ -410,7 +477,7 @@ class dbObject
             $this->data = $r;
             $this->processAllWith($r, false);
             if ($this->returnType == 'Object') {
-                $item = new static($r);
+                $item = new static($r); // @phpstan-ignore-line
                 $item->isNew = false;
                 $objects[] = $item;
             }
@@ -433,11 +500,11 @@ class dbObject
      * @access public
      * @param string $objectName Object Name
      *
-     * @return dbObject
+     * @return object
      */
     private function with($objectName)
     {
-        if (!property_exists($this, 'relations') && !isset($this->relations[$name])) {
+        if (!property_exists($this, 'relations') && !isset($this->relations[$objectName])) { // @phpstan-ignore-line
             die("No relation with name $objectName found");
         }
 
@@ -499,23 +566,24 @@ class dbObject
      * @access public
      * @param int $page Page number
      * @param array|string $fields Array or coma separated list of fields to fetch
-     * @return array
+     * @return mixed
      */
     private function paginate($page, $fields = null)
     {
         $this->db->pageLimit = self::$pageLimit;
         $res = $this->db->paginate($this->dbTable, $page, $fields);
         self::$totalPages = $this->db->totalPages;
+        self::$totalCount = $this->db->totalCount;
         if ($this->db->count == 0) {
             return null;
         }
-
+        $objects = array();
         foreach ($res as &$r) {
             $this->processArrays($r);
             $this->data = $r;
             $this->processAllWith($r, false);
             if ($this->returnType == 'Object') {
-                $item = new static($r);
+                $item = new static($r); // @phpstan-ignore-line
                 $item->isNew = false;
                 $objects[] = $item;
             }
@@ -564,7 +632,7 @@ class dbObject
      */
     public static function __callStatic($method, $arg)
     {
-        $obj = new static;
+        $obj = new static(); // @phpstan-ignore-line
         $result = call_user_func_array(array($obj, $method), $arg);
         if (method_exists($obj, $method)) {
             return $result;
