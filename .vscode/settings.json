@@ -1,0 +1,5 @@
+{
+    "phpstan.configuration": "phpstan.neon",
+    "phpstan.level": "4",
+    "phpstan.memoryLimit": "2048M"
+}
