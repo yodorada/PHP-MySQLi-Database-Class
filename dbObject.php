@@ -800,6 +800,10 @@ class dbObject
                 $required = true;
             }
 
+            if (isset($specs['isNullable']) && $specs['isNullable'] && $value==null) {
+                continue;
+            }
+
             if ($required && strlen($value) == 0) {
                 $this->errors[] = array($this->dbTable . "." . $key => "is required");
                 continue;
