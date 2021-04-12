@@ -788,6 +788,10 @@ class dbObject
                 $value = null;
             }
 
+            if (isset($specs['isNullable']) && $specs['isNullable'] && $value==null) {
+                continue;
+            }
+
             if (is_array($value)) {
                 continue;
             }
@@ -798,10 +802,6 @@ class dbObject
 
             if (isset($specs['required']) && $specs['required']) {
                 $required = true;
-            }
-
-            if (isset($specs['isNullable']) && $specs['isNullable'] && $value==null) {
-                continue;
             }
 
             if ($required && strlen($value) == 0) {
