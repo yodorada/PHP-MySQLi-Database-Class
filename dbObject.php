@@ -848,7 +848,7 @@ class dbObject
     {
         $this->errors = array();
         $sqlData = array();
-        if (count($this->data) == 0) {
+        if (!is_array($this->data) OR count($this->data) == 0) {
             return array();
         }
 
